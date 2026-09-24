@@ -42,10 +42,11 @@ const themes = {
 } as const;
 
 function formatGap(milliseconds: number) {
-  if (milliseconds < 1000) return `${milliseconds} ms`;
-  if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(2)} seconds`;
-  const minutes = Math.floor(milliseconds / 60_000);
-  const seconds = ((milliseconds % 60_000) / 1000).toFixed(1);
+  const preciseMs = Math.max(0, Math.trunc(milliseconds));
+  if (preciseMs < 1000) return `${milliseconds.toFixed(3)} milliseconds`;
+  if (preciseMs < 60_000) return `${(milliseconds / 1000).toFixed(6)} seconds`;
+  const minutes = Math.floor(preciseMs / 60_000);
+  const seconds = ((milliseconds % 60_000) / 1000).toFixed(6);
   return `${minutes} min ${seconds} sec`;
 }
 

@@ -27,23 +27,41 @@ export async function getPublicTreasure(token: string): Promise<Pick<TreasureSum
 export async function claimTreasure(token: string): Promise<{ state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' }> {
   await ready();
   const winnerKey = randomBytes(32).toString('base64url');
-  // One SQL statement is the linearization point. PostgreSQL locks the matching row;
-  // after a concurrent UPDATE commits it rechecks claimed_at IS NULL. Only one
-  // request can receive the treasure, even across processes or app replicas.
-  const result = await db.query<{ title: string; treasure: string }>(
-    'UPDATE treasure_links SET claimed_at = clock_timestamp(), winner_key_hash = $2 WHERE token = $1 AND claimed_at IS NULL RETURNING title, treasure', [token, winnerKeyHash(winnerKey)],
-  );
-  if (result.rows[0]) return { state: 'won', ...result.rows[0], winnerKey };
-  // Measure the miss after it has waited on the same row lock as the winner.
-  // Both timestamps are from PostgreSQL; visitor device clocks are never compared.
-  const outcome = await db.query<{ gap_ms: number | null }>(`
-    SELECT CASE WHEN claimed_at IS NULL THEN NULL
-      ELSE GREATEST(0, floor(extract(epoch FROM (clock_timestamp() - claimed_at)) * 1000))::int
-    END AS gap_ms
-    FROM treasure_links WHERE token = $1
-  `, [token]);
-  if (!outcome.rows[0]) return { state: 'missing' };
-  return { state: 'claimed', gapMs: Math.max(0, outcome.rows[0].gap_ms ?? 0) };
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    // Serialize claims for this token on its row, across all app processes.
+    // Once a losing request acquires this lock, its next DB timestamp is captured
+    // immediately so a second read round-trip does not inflate the displayed gap.
+    const locked = await client.query<{ title: string; treasure: string; claimed: boolean; gap_us: string | null }>(`
+      SELECT title, treasure, claimed_at IS NOT NULL AS claimed,
+        CASE WHEN claimed_at IS NULL THEN NULL ELSE
+          GREATEST(0, floor(extract(epoch FROM (clock_timestamp() - claimed_at)) * 1000000))::text
+        END AS gap_us
+      FROM treasure_links WHERE token = $1 FOR UPDATE
+    `, [token]);
+    const link = locked.rows[0];
+    if (!link) {
+      await client.query('COMMIT');
+      return { state: 'missing' };
+    }
+    if (!link.claimed) {
+      const won = await client.query<{ title: string; treasure: string }>(
+        'UPDATE treasure_links SET claimed_at = clock_timestamp(), winner_key_hash = $2 WHERE token = $1 RETURNING title, treasure', [token, winnerKeyHash(winnerKey)],
+      );
+      await client.query('COMMIT');
+      return { state: 'won', ...won.rows[0], winnerKey };
+    }
+    // The gap was measured by the same locking SELECT at microsecond precision,
+    // after this request acquired the row lock (not from browser clocks).
+    await client.query('COMMIT');
+    return { state: 'claimed', gapMs: Math.max(0, Number(link.gap_us) / 1000) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function saveWinnerName(token: string, key: string, name: string): Promise<'saved' | 'already-set' | 'unauthorized'> {
