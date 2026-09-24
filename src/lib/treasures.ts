@@ -24,7 +24,7 @@ export async function getPublicTreasure(token: string): Promise<Pick<TreasureSum
   return result.rows[0] ?? null;
 }
 
-export async function claimTreasure(token: string): Promise<{ state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' }> {
+export async function claimTreasure(token: string, recoveryKey?: string): Promise<{ state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' }> {
   await ready();
   const winnerKey = randomBytes(32).toString('base64url');
   const client = await db.connect();
@@ -33,8 +33,8 @@ export async function claimTreasure(token: string): Promise<{ state: 'won'; titl
     // Serialize claims for this token on its row, across all app processes.
     // Once a losing request acquires this lock, its next DB timestamp is captured
     // immediately so a second read round-trip does not inflate the displayed gap.
-    const locked = await client.query<{ title: string; treasure: string; claimed: boolean; gap_us: string | null }>(`
-      SELECT title, treasure, claimed_at IS NOT NULL AS claimed,
+    const locked = await client.query<{ title: string; treasure: string; claimed: boolean; gap_us: string | null; winner_key_hash: string | null }>(`
+      SELECT title, treasure, claimed_at IS NOT NULL AS claimed, winner_key_hash,
         CASE WHEN claimed_at IS NULL THEN NULL ELSE
           GREATEST(0, floor(extract(epoch FROM (clock_timestamp() - claimed_at)) * 1000000))::text
         END AS gap_us
@@ -51,6 +51,12 @@ export async function claimTreasure(token: string): Promise<{ state: 'won'; titl
       );
       await client.query('COMMIT');
       return { state: 'won', ...won.rows[0], winnerKey };
+    }
+    // The hashed HttpOnly recovery key allows only this browser to retrieve its
+    // own winning result after a reload. Never return the secret to other visitors.
+    if (recoveryKey && link.winner_key_hash && winnerKeyHash(recoveryKey) === link.winner_key_hash) {
+      await client.query('COMMIT');
+      return { state: 'won', title: link.title, treasure: link.treasure, winnerKey: recoveryKey };
     }
     // The gap was measured by the same locking SELECT at microsecond precision,
     // after this request acquired the row lock (not from browser clocks).
