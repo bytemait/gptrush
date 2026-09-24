@@ -1,4 +1,4 @@
-# Firstlight — one link, one treasure
+# gptrush — one link, one treasure
 
 An admin makes a unique link for a treasure. When someone opens that link, the browser immediately sends a claim request. The first successful claim sees the secret. Everyone after sees “Better luck next time.” No name, signup, start button, or event setup is required.
 
@@ -9,7 +9,7 @@ An admin makes a unique link for a treasure. When someone opens that link, the b
 3. Run `docker compose up --build -d`. Open http://localhost:3000 (or your configured `APP_PORT`) and sign in.
 4. Stop with `docker compose down`. Database data persists in the named `postgres_data` volume; **do not** run `docker compose down -v` unless you intend to delete all treasure links.
 
-Tables are initialized automatically on first use. Keep `.env` private and back up the Postgres volume for production use. Terminate HTTPS at a trusted reverse proxy; set `APP_URL` to that same public origin.
+Tables are initialized automatically on first use. Keep `.env` private and back up the Postgres volume for production use. Terminate HTTPS at a trusted reverse proxy; set `APP_URL` to that same public origin. Existing deployments should keep their current `POSTGRES_USER` and `POSTGRES_DB` values in `.env` when upgrading, or the app will connect to a different database. The renamed admin cookie requires signing in again.
 
 ## Run without Docker
 

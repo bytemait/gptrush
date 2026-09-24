@@ -1,7 +1,7 @@
 import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 
-const cookieName = 'firstlight_admin';
+const cookieName = 'gptrush_admin';
 const durationSeconds = 12 * 60 * 60;
 
 function signature(payload: string) {

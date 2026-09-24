@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Firstlight — one link, one treasure',
+  title: 'gptrush — one link, one treasure',
   description: 'Create one-time treasure links. The first visitor wins.', metadataBase: new URL(process.env.APP_URL || 'http://localhost:3000'),
 };
 
