@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import CreditHowTo from './credit-how-to';
 
 type Result = { state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number; rank: number; message: string | null; tier: string | null } | { state: 'missing' };
 type Theme = 'waiting' | 'won' | 'claimed';
@@ -41,9 +42,43 @@ function formatGap(milliseconds: number) {
   return `${minutes} min ${seconds} sec`;
 }
 
-function PixelField({ theme }: { theme: Theme }) {
-  const color = theme === 'won' ? 'bg-[#6acbff]' : theme === 'claimed' ? 'bg-[#ffe05a]' : 'bg-[#b9ff52]';
-  return <div aria-hidden="true" className={`pointer-events-none absolute inset-0 mask-[url('/art/pixels.svg')] mask-center mask-contain mask-no-repeat ${color}`} />;
+function CreditArtifact({ theme }: { theme: Theme }) {
+  const palette = theme === 'won'
+    ? { accent: '#6acbff', muted: '#397fa5', text: '#b7eaff' }
+    : theme === 'claimed'
+      ? { accent: '#ffe05a', muted: '#9a7b28', text: '#fff0ad' }
+      : { accent: '#b9ff52', muted: '#587c35', text: '#dcffb5' };
+  const visual = theme === 'won'
+    ? { border: 'border-[#29445a]', grid: '[background-image:linear-gradient(to_right,#6acbff10_1px,transparent_1px),linear-gradient(to_bottom,#6acbff10_1px,transparent_1px)]', motion: 'animate-pulse', face: 'bg-[#0b1420]' }
+    : theme === 'claimed'
+      ? { border: 'border-[#51462c]', grid: '[background-image:linear-gradient(to_right,#ffe05a10_1px,transparent_1px),linear-gradient(to_bottom,#ffe05a10_1px,transparent_1px)]', motion: '', face: 'bg-[#19150b]' }
+      : { border: 'border-[#263621]', grid: '[background-image:linear-gradient(to_right,#b9ff5210_1px,transparent_1px),linear-gradient(to_bottom,#b9ff5210_1px,transparent_1px)]', motion: 'animate-pulse', face: 'bg-[#0d150b]' };
+  const pixels = Array.from({ length: 196 }, (_, i) => {
+    const x = i % 14;
+    const y = Math.floor(i / 14);
+    const edge = Math.min(x, y, 13 - x, 13 - y);
+    const on = ((x * 7 + y * 11 + x * y * 3) % 13) < 7 - Math.min(edge, 3);
+    return on ? { x, y } : null;
+  }).filter((pixel): pixel is { x: number; y: number } => pixel !== null);
+
+  return <div aria-hidden="true" className={`relative mx-auto flex aspect-[5/4] w-full max-w-[520px] items-center justify-center overflow-hidden border bg-[#0a0e09] transition-colors duration-700 ${visual.border}`}>
+    <div className={`absolute inset-0 opacity-60 ${visual.grid} [background-size:20px_20px]`} />
+    <div className="absolute left-4 top-4 text-[10px] tracking-widest" style={{ color: palette.text }}>OPENAI CREDITS / 01</div>
+    <div className="absolute bottom-4 right-4 text-[10px] tracking-widest" style={{ color: palette.text }}>GP / REWARD</div>
+    <div className={`credit-artifact relative flex h-[72%] w-[72%] items-center justify-center ${visual.motion} motion-reduce:animate-none ${theme === 'claimed' ? 'opacity-65' : ''}`} style={{ color: palette.accent }}>
+      <div className="absolute inset-[8%] rotate-45 border-2 border-current opacity-60" />
+      <div className="absolute inset-[17%] rotate-45 border border-current opacity-35" />
+      <div className={`relative flex aspect-[1.45/1] w-[72%] items-center justify-center overflow-hidden border-2 border-current ${visual.face} shadow-[0_0_48px_color-mix(in_srgb,currentColor_18%,transparent)]`}>
+        <div className="absolute inset-2 border border-current opacity-30" />
+        <svg viewBox="0 0 112 80" className="relative h-[62%] w-[62%]" shapeRendering="crispEdges">
+          {pixels.map(({ x, y }) => <rect key={`${x}-${y}`} x={x * 8} y={y * 8} width="7" height="7" fill={x < 2 || y < 2 || x > 11 || y > 11 ? palette.muted : palette.accent} opacity={((x * 5 + y * 3) % 5 + 4) / 8} />)}
+        </svg>
+        <span className="absolute bottom-2 right-3 text-[8px] font-bold tracking-[.18em]" style={{ color: palette.text }}>CREDITS</span>
+      </div>
+      {theme === 'won' && <><span className="absolute left-[12%] top-[20%] h-2 w-2 animate-ping bg-current" /><span className="absolute bottom-[18%] right-[14%] h-2 w-2 animate-pulse bg-current" /><span className="absolute right-[15%] top-[16%] h-1.5 w-1.5 animate-ping bg-current [animation-delay:400ms]" /></>}
+      {theme === 'claimed' && <div className="absolute bottom-[6%] rounded-sm border border-current bg-[#17140a] px-3 py-1 text-[9px] font-bold tracking-[.18em]">ALREADY CLAIMED</div>}
+    </div>
+  </div>;
 }
 
 function Confetti() {
@@ -141,18 +176,20 @@ export default function TreasureReveal({ token, title, missing = false, unavaila
           <div className={`mb-8 flex items-center gap-3 text-[11px] font-bold tracking-[.2em] sm:text-xs ${colors.accent}`}><span className={`h-2.5 w-2.5 ${colors.dot}`} />{stateLabel}</div>
           <h1 aria-live="polite" className="text-[clamp(4.2rem,16vw,10rem)] font-black leading-[.84] tracking-[-.105em] sm:text-[clamp(6rem,11vw,10rem)]">{heading}</h1>
           <div className={`mt-8 border-l-2 pl-4 transition-colors duration-700 sm:mt-10 sm:pl-6 ${colors.accentBorder}`}>
-            <p className={`text-xs font-bold uppercase tracking-[.18em] ${colors.muted}`}>{title || 'TREASURE LINK'}</p>
-            <p className="mt-3 max-w-lg text-lg font-bold leading-snug sm:text-xl lg:text-2xl">{won ? 'You got here first. This moment is yours.' : result?.state === 'claimed' ? <>{result.message && <span className={`mb-3 block text-base font-black sm:text-lg ${colors.accent}`}>{result.message}</span>}Someone else found this one first. You were <span className={colors.accent}>{formatGap(result.gapMs)}</span> behind. Keep looking.</> : result?.state === 'missing' ? 'This link does not exist. Double-check it and try again.' : error ? error : 'Checking the signal. This will only take a second.'}</p>
+            <p className={`text-xs font-bold uppercase tracking-[.18em] ${colors.muted}`}>{title || 'OPENAI CREDIT DROP'}</p>
+            <p className="mt-3 max-w-lg text-lg font-bold leading-snug sm:text-xl lg:text-2xl">{won ? 'You got here first. Your OpenAI credits are ready.' : result?.state === 'claimed' ? <>{result.message && <span className={`mb-3 block text-base font-black sm:text-lg ${colors.accent}`}>{result.message}</span>}Someone else found this one first. You were <span className={colors.accent}>{formatGap(result.gapMs)}</span> behind. Keep looking.</> : result?.state === 'missing' ? 'This link does not exist. Double-check it and try again.' : error ? error : 'Checking the signal. This will only take a second.'}</p>
             {result?.state === 'claimed' && <p className={`mt-3 text-xs leading-5 ${colors.soft}`}>That’s the gap between claims reaching the server—not a comparison of device clocks.</p>}
           </div>
         </section>
-        <div className={`relative mx-auto aspect-[5/4] w-full max-w-[520px] overflow-hidden border transition-colors duration-700 lg:max-w-none ${colors.surface}`}><PixelField theme={theme} /><div className={`pointer-events-none absolute left-4 top-4 text-[10px] tracking-widest ${colors.muted}`}>FIG. 01 — FIRST IN</div><div className={`pointer-events-none absolute bottom-4 right-4 text-[10px] tracking-widest ${colors.muted}`}>GP / 001</div></div>
+        <CreditArtifact theme={theme} />
       </div>
 
       {won && <section className={`relative z-10 mb-8 grid gap-0 border lg:grid-cols-[minmax(0,1fr)_minmax(0,.8fr)] ${colors.accentBorder}`}>
-        <div className={`min-w-0 border-b p-5 sm:p-8 lg:border-b-0 lg:border-r ${colors.divider}`}><p className={`text-[11px] font-bold tracking-[.2em] ${colors.accent}`}>YOUR TREASURE / REVEALED</p><div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0 whitespace-pre-wrap break-words text-2xl font-black leading-tight tracking-tight sm:text-4xl">{result.treasure}</div><button type="button" onClick={copyTreasure} className={`min-h-12 shrink-0 border px-4 text-xs font-black transition hover:text-[#0a0e09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${colors.outline}`} aria-label="Copy treasure text">{copied ? 'COPIED' : 'COPY TREASURE'}</button></div>{copyError && <p role="alert" className="mt-3 text-xs text-[#ff9885]">{copyError}</p>}<p className={`mt-7 text-sm leading-6 ${colors.soft}`}>Your device can reopen this treasure for 30 days. Keep this browser profile and its site data.</p></div>
+        <div className={`min-w-0 border-b p-5 sm:p-8 lg:border-b-0 lg:border-r ${colors.divider}`}><p className={`text-[11px] font-bold tracking-[.2em] ${colors.accent}`}>YOUR OPENAI CREDIT CODE / REVEALED</p><p className={`mt-3 text-xs leading-5 ${colors.soft}`}>Treat this like a password. Copy it somewhere private and don’t share it publicly.</p><div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0 whitespace-pre-wrap break-all rounded border border-current/30 bg-black/20 p-4 font-mono text-xl font-black leading-tight tracking-[.06em] sm:text-2xl" aria-label="Your OpenAI credit code">{result.treasure}</div><button type="button" onClick={copyTreasure} className={`min-h-12 shrink-0 border px-4 text-xs font-black transition hover:text-[#0a0e09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${colors.outline}`} aria-label="Copy OpenAI credit code">{copied ? 'COPIED' : 'COPY CODE'}</button></div>{copyError && <p role="alert" className="mt-3 text-xs text-[#ff9885]">{copyError}</p>}<p className={`mt-7 text-sm leading-6 ${colors.soft}`}>Your browser can reopen the code for 30 days. Keep this browser profile and its site data.</p></div>
         <div className="min-w-0 p-5 sm:p-8"><p className={`text-[11px] font-bold tracking-[.2em] ${colors.accent}`}>MAKE IT OFFICIAL / OPTIONAL</p><h2 className="mt-4 text-2xl font-black leading-tight sm:text-3xl">PUT YOUR NAME<br />ON THE BOARD.</h2>{savedName ? <p role="status" className={`mt-8 border p-4 text-lg font-bold ${colors.saved}`}>SAVED: {savedName}</p> : <form onSubmit={submitName} className="mt-6"><label htmlFor="winner-name" className={`block text-xs font-bold uppercase tracking-[.15em] ${colors.soft}`}>Your name</label><div className="mt-3 flex flex-col gap-3 sm:flex-row"><input id="winner-name" type="text" autoComplete="name" required maxLength={60} value={name} onChange={e => setName(e.target.value)} placeholder="ENTER YOUR NAME" className={`min-h-14 min-w-0 flex-1 rounded-none border px-4 text-base font-bold text-white outline-none ${colors.input}`} /><button type="submit" disabled={submitting} className={`min-h-14 shrink-0 px-6 text-sm font-black transition disabled:opacity-60 ${colors.button}`}>{submitting ? 'SAVING...' : 'SUBMIT NAME →'}</button></div>{nameError && <p role="alert" className="mt-3 text-sm text-[#ff9885]">{nameError}</p>}<p className={`mt-4 text-xs leading-5 ${colors.soft}`}>Only your name is shared with the event admin. You can skip this.</p></form>}</div>
       </section>}
+
+      {won && <CreditHowTo />}
 
       <footer className={`flex flex-wrap items-center justify-between gap-2 border-t py-5 text-[10px] font-bold uppercase tracking-[.16em] sm:text-xs ${colors.border} ${colors.muted}`}><span>GPTRUSH / FIND YOUR MOMENT</span><span>BUILT FOR THE FIRST TO ARRIVE</span></footer>
     </div>
