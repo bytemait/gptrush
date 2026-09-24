@@ -19,8 +19,12 @@ export function ready() {
       title text NOT NULL,
       treasure text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(),
-      claimed_at timestamptz
+      claimed_at timestamptz,
+      winner_key_hash text,
+      winner_name text
     );
+    ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS winner_key_hash text;
+    ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS winner_name text;
   `).then(() => undefined).catch(error => { schemaReady = undefined; throw error; });
   return schemaReady;
 }

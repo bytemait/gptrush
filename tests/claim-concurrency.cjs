@@ -10,19 +10,29 @@ async function main() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS treasure_links (
       token text PRIMARY KEY, title text NOT NULL, treasure text NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(), claimed_at timestamptz
+      created_at timestamptz NOT NULL DEFAULT now(), claimed_at timestamptz,
+      winner_key_hash text, winner_name text
     )`);
+    await pool.query('ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS winner_key_hash text');
+    await pool.query('ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS winner_name text');
     await pool.query('INSERT INTO treasure_links (token, title, treasure) VALUES ($1, $2, $3)', [token, 'Race test', 'secret']);
     const results = await Promise.all(Array.from({ length: 100 }, async () => {
+      const keyHash = randomBytes(32).toString('hex');
       const { rows } = await pool.query(
-        'UPDATE treasure_links SET claimed_at = clock_timestamp() WHERE token = $1 AND claimed_at IS NULL RETURNING title, treasure', [token],
+        'UPDATE treasure_links SET claimed_at = clock_timestamp(), winner_key_hash = $2 WHERE token = $1 AND claimed_at IS NULL RETURNING title, treasure', [token, keyHash],
       );
-      return rows[0] ?? null;
+      return rows[0] ? { ...rows[0], keyHash } : null;
     }));
-    assert.equal(results.filter(Boolean).length, 1, 'Exactly one request must receive the treasure');
-    assert.equal(results.filter(Boolean)[0].treasure, 'secret');
+    const winner = results.find(Boolean);
+    assert.ok(winner, 'Exactly one request must receive the treasure');
+    assert.equal(winner.treasure, 'secret');
     assert.equal(results.filter(value => value === null).length, 99);
-    console.log('Passed: 100 simultaneous claims, exactly one winner and 99 misses.');
+    const wrongKey = randomBytes(32).toString('hex');
+    const denied = await pool.query('UPDATE treasure_links SET winner_name = $3 WHERE token = $1 AND winner_key_hash = $2 AND winner_name IS NULL RETURNING token', [token, wrongKey, 'Impostor']);
+    assert.equal(denied.rowCount, 0, 'A non-winner key cannot set a winner name');
+    const nameWrite = await pool.query('UPDATE treasure_links SET winner_name = $3 WHERE token = $1 AND winner_key_hash = $2 AND winner_name IS NULL RETURNING winner_name', [token, winner.keyHash, 'Concurrent Winner']);
+    assert.equal(nameWrite.rows[0].winner_name, 'Concurrent Winner');
+    console.log('Passed: 100 simultaneous claims, one winner, 99 misses, and winner-only name submission.');
   } finally {
     await pool.query('DELETE FROM treasure_links WHERE token = $1', [token]);
     await pool.end();
