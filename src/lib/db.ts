@@ -21,10 +21,19 @@ export function ready() {
       created_at timestamptz NOT NULL DEFAULT now(),
       claimed_at timestamptz,
       winner_key_hash text,
-      winner_name text
+      winner_name text,
+      loser_count integer NOT NULL DEFAULT 0
     );
     ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS winner_key_hash text;
     ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS winner_name text;
+    ALTER TABLE treasure_links ADD COLUMN IF NOT EXISTS loser_count integer NOT NULL DEFAULT 0;
+    CREATE TABLE IF NOT EXISTS treasure_visits (
+      token text NOT NULL REFERENCES treasure_links(token) ON DELETE CASCADE,
+      visit_key_hash text NOT NULL,
+      result jsonb NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (token, visit_key_hash)
+    );
   `).then(() => undefined).catch(error => { schemaReady = undefined; throw error; });
   return schemaReady;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-type Result = { state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' };
+type Result = { state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number; rank: number; message: string | null; tier: string | null } | { state: 'missing' };
 type Theme = 'waiting' | 'won' | 'claimed';
 
 const themes = {
@@ -142,7 +142,7 @@ export default function TreasureReveal({ token, title, missing = false, unavaila
           <h1 aria-live="polite" className="text-[clamp(4.2rem,16vw,10rem)] font-black leading-[.84] tracking-[-.105em] sm:text-[clamp(6rem,11vw,10rem)]">{heading}</h1>
           <div className={`mt-8 border-l-2 pl-4 transition-colors duration-700 sm:mt-10 sm:pl-6 ${colors.accentBorder}`}>
             <p className={`text-xs font-bold uppercase tracking-[.18em] ${colors.muted}`}>{title || 'TREASURE LINK'}</p>
-            <p className="mt-3 max-w-lg text-lg font-bold leading-snug sm:text-xl lg:text-2xl">{won ? 'You got here first. This moment is yours.' : result?.state === 'claimed' ? <>Someone else found this one first. You were <span className={colors.accent}>{formatGap(result.gapMs)}</span> behind. Keep looking.</> : result?.state === 'missing' ? 'This link does not exist. Double-check it and try again.' : error ? error : 'Checking the signal. This will only take a second.'}</p>
+            <p className="mt-3 max-w-lg text-lg font-bold leading-snug sm:text-xl lg:text-2xl">{won ? 'You got here first. This moment is yours.' : result?.state === 'claimed' ? <>{result.message && <span className={`mb-3 block text-base font-black sm:text-lg ${colors.accent}`}>{result.message}</span>}Someone else found this one first. You were <span className={colors.accent}>{formatGap(result.gapMs)}</span> behind. Keep looking.</> : result?.state === 'missing' ? 'This link does not exist. Double-check it and try again.' : error ? error : 'Checking the signal. This will only take a second.'}</p>
             {result?.state === 'claimed' && <p className={`mt-3 text-xs leading-5 ${colors.soft}`}>That’s the gap between claims reaching the server—not a comparison of device clocks.</p>}
           </div>
         </section>
