@@ -24,7 +24,7 @@ export async function getPublicTreasure(token: string): Promise<Pick<TreasureSum
   return result.rows[0] ?? null;
 }
 
-export async function claimTreasure(token: string): Promise<{ state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed' | 'missing' }> {
+export async function claimTreasure(token: string): Promise<{ state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' }> {
   await ready();
   const winnerKey = randomBytes(32).toString('base64url');
   // One SQL statement is the linearization point. PostgreSQL locks the matching row;
@@ -34,8 +34,16 @@ export async function claimTreasure(token: string): Promise<{ state: 'won'; titl
     'UPDATE treasure_links SET claimed_at = clock_timestamp(), winner_key_hash = $2 WHERE token = $1 AND claimed_at IS NULL RETURNING title, treasure', [token, winnerKeyHash(winnerKey)],
   );
   if (result.rows[0]) return { state: 'won', ...result.rows[0], winnerKey };
-  const exists = await db.query('SELECT 1 FROM treasure_links WHERE token = $1', [token]);
-  return { state: exists.rows.length ? 'claimed' : 'missing' };
+  // Measure the miss after it has waited on the same row lock as the winner.
+  // Both timestamps are from PostgreSQL; visitor device clocks are never compared.
+  const outcome = await db.query<{ gap_ms: number | null }>(`
+    SELECT CASE WHEN claimed_at IS NULL THEN NULL
+      ELSE GREATEST(0, floor(extract(epoch FROM (clock_timestamp() - claimed_at)) * 1000))::int
+    END AS gap_ms
+    FROM treasure_links WHERE token = $1
+  `, [token]);
+  if (!outcome.rows[0]) return { state: 'missing' };
+  return { state: 'claimed', gapMs: Math.max(0, outcome.rows[0].gap_ms ?? 0) };
 }
 
 export async function saveWinnerName(token: string, key: string, name: string): Promise<'saved' | 'already-set' | 'unauthorized'> {

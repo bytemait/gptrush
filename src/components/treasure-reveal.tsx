@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-type Result = { state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed' | 'missing' };
+type Result = { state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' };
 type Theme = 'waiting' | 'won' | 'claimed';
 
 // Dithered pixel artwork; all styling uses Tailwind utilities rather than custom CSS.
@@ -40,6 +40,14 @@ const themes = {
     saved: 'border-[#ffe05a] bg-[#ffe05a]/10 text-[#ffe05a]', glow: 'text-[#ffe05a]',
   },
 } as const;
+
+function formatGap(milliseconds: number) {
+  if (milliseconds < 1000) return `${milliseconds} ms`;
+  if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(2)} seconds`;
+  const minutes = Math.floor(milliseconds / 60_000);
+  const seconds = ((milliseconds % 60_000) / 1000).toFixed(1);
+  return `${minutes} min ${seconds} sec`;
+}
 
 function PixelField({ theme }: { theme: Theme }) {
   const color = theme === 'won' ? 'text-[#6acbff]' : theme === 'claimed' ? 'text-[#ffe05a]' : 'text-[#b9ff52]';
@@ -149,7 +157,8 @@ export default function TreasureReveal({ token, title, missing = false, unavaila
           <h1 aria-live="polite" className="text-[clamp(4.2rem,16vw,10rem)] font-black leading-[.84] tracking-[-.105em] sm:text-[clamp(6rem,11vw,10rem)]">{heading}</h1>
           <div className={`mt-8 border-l-2 pl-4 transition-colors duration-700 sm:mt-10 sm:pl-6 ${colors.accentBorder}`}>
             <p className={`text-xs font-bold uppercase tracking-[.18em] ${colors.muted}`}>{title || 'TREASURE LINK'}</p>
-            <p className="mt-3 max-w-lg text-lg font-bold leading-snug sm:text-xl lg:text-2xl">{won ? 'You got here first. This moment is yours.' : result?.state === 'claimed' ? 'Someone else found this one first. Keep looking.' : result?.state === 'missing' ? 'This link does not exist. Double-check it and try again.' : error ? error : 'Checking the signal. This will only take a second.'}</p>
+            <p className="mt-3 max-w-lg text-lg font-bold leading-snug sm:text-xl lg:text-2xl">{won ? 'You got here first. This moment is yours.' : result?.state === 'claimed' ? <>Someone else found this one first. You were <span className={colors.accent}>{formatGap(result.gapMs)}</span> behind. Keep looking.</> : result?.state === 'missing' ? 'This link does not exist. Double-check it and try again.' : error ? error : 'Checking the signal. This will only take a second.'}</p>
+            {result?.state === 'claimed' && <p className={`mt-3 text-xs leading-5 ${colors.soft}`}>That’s the gap between claims reaching the server—not a comparison of device clocks.</p>}
           </div>
         </section>
         <div className={`relative mx-auto aspect-[5/4] w-full max-w-[520px] overflow-hidden border transition-colors duration-700 lg:max-w-none ${colors.surface}`}><PixelField theme={theme} /><div className={`pointer-events-none absolute left-4 top-4 text-[10px] tracking-widest ${colors.muted}`}>FIG. 01 — FIRST IN</div><div className={`pointer-events-none absolute bottom-4 right-4 text-[10px] tracking-widest ${colors.muted}`}>GP / 001</div></div>
