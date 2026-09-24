@@ -5,15 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 type Result = { state: 'won'; title: string; treasure: string; winnerKey: string } | { state: 'claimed'; gapMs: number } | { state: 'missing' };
 type Theme = 'waiting' | 'won' | 'claimed';
 
-// Dithered pixel artwork; all styling uses Tailwind utilities rather than custom CSS.
-const pixels = Array.from({ length: 30 * 24 }, (_, i) => {
-  const x = i % 30;
-  const y = Math.floor(i / 30);
-  const radius = Math.hypot((x - 15) / 15, (y - 12) / 12);
-  const noise = ((x * 41 + y * 67 + x * y * 13) % 17) / 17;
-  return { x, y, radius, noise };
-}).filter(({ radius, noise }) => radius < 1.12 && noise > radius * .48);
-
 const themes = {
   waiting: {
     accent: 'text-[#b9ff52]', muted: 'text-[#9ab17f]', soft: 'text-[#b4c6a2]',
@@ -51,15 +42,8 @@ function formatGap(milliseconds: number) {
 }
 
 function PixelField({ theme }: { theme: Theme }) {
-  const color = theme === 'won' ? 'text-[#6acbff]' : theme === 'claimed' ? 'text-[#ffe05a]' : 'text-[#b9ff52]';
-  return <svg aria-hidden="true" viewBox="0 0 480 384" className={`pointer-events-none absolute inset-0 h-full w-full transition-colors duration-700 ${color}`} preserveAspectRatio="xMidYMid meet">
-    {pixels.map(({ x, y, radius, noise }) => <rect key={`${x}-${y}`} x={x * 16 + 3} y={y * 16 + 3} width={radius < .35 && noise > .6 ? 9 : 4} height={radius < .35 && noise > .6 ? 9 : 4} fill="currentColor" opacity={Math.max(.12, (1.12 - radius) * .48)} />)}
-    <path d="M240 90v22m0 160v22M114 192h22m208 0h22M155 107l16 16m138 138 16 16M325 107l-16 16M171 261l-16 16" fill="none" stroke="currentColor" strokeWidth="2" opacity=".45" />
-    <path d="M240 119l73 73-73 73-73-73z" fill="#0a0e09" stroke="currentColor" strokeWidth="3" />
-    <path d="M240 139l53 53-53 53-53-53z" fill="currentColor" opacity=".12" />
-    <path d="M240 161v62m-31-31h62" stroke="currentColor" strokeWidth="5" strokeLinecap="square" />
-    <path d="M240 146v10m0 72v10m-46-46h10m72 0h10" stroke="currentColor" strokeWidth="3" />
-  </svg>;
+  const color = theme === 'won' ? 'bg-[#6acbff]' : theme === 'claimed' ? 'bg-[#ffe05a]' : 'bg-[#b9ff52]';
+  return <div aria-hidden="true" className={`pointer-events-none absolute inset-0 mask-[url('/art/pixels.svg')] mask-center mask-contain mask-no-repeat ${color}`} />;
 }
 
 function Confetti() {
